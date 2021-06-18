@@ -1,58 +1,78 @@
+import { PoolPairData } from '@defichain/whale-api-client/dist/api/poolpair'
+import { TokenData } from "@defichain/whale-api-client/dist/api/tokens";
 import * as React from 'react'
+import { useEffect, useState } from 'react'
+import { SectionList } from 'react-native'
 import tailwind from 'tailwind-rn'
-import { createStackNavigator } from '@react-navigation/stack'
-import { useDispatch, useSelector } from 'react-redux'
-
+import { Text, View } from '../../../../components'
+import { useWhaleApiClient } from '../../../../hooks/api/useWhaleApiClient'
 import { translate } from '../../../../translations'
-import { Button, Text, View } from 'react-native'
-import { decrement, increment, incrementAsync, incrementIfOdd } from '../../../../store/liquidity'
-import { RootState } from '../../../../store'
 
 export function LiquidityScreen (): JSX.Element {
-  const count = useSelector<RootState>(state => state.counter.value)
-  const status = useSelector<RootState>(state => state.counter.status)
-  const dispatch = useDispatch()
+  const whaleApiClient = useWhaleApiClient()
+  const [status, setStatus] = useState<string>('loading')
+  const [lpTokens, setLpTokens] = useState<DexItem<TokenData>[]>([]);
+  const [pairs, setPairs] = useState<Array<DexItem<PoolPairData>>>([])
 
+  useEffect(() => {
+    whaleApiClient.poolpair.list(30).then(pairs => {
+      const items: Array<DexItem<PoolPairData>> = [...pairs].map(data => ({ type: 'available', data: data }))
+      setPairs(items)
+    })
+    setStatus('loaded')
+  }, [status])
+
+  /// TODO(fuxingloh): section header
   return (
-    <View style={tailwind('flex-1 items-center justify-center')}>
-      <Text style={tailwind('text-xl font-bold')}>
-        {translate('screens/LiquidityScreen', 'Liquidity')}
-      </Text>
-
-      <View style={tailwind('w-4/5 h-px my-8')} />
-
-      <Button title='Increment' onPress={() => dispatch(increment())} />
-      <Button title='Decrement' onPress={() => dispatch(decrement())} />
-      <Button title='Increment 10 If Odd' onPress={() => dispatch(incrementIfOdd(10))} />
-      <Button title='Increment 5 Async' onPress={() => dispatch(incrementAsync(5))} />
-
-      <Text testID='something'>
-        Count: {count}
-      </Text>
-
-      <Text testID='loading'>
-        Loading: {status}
-      </Text>
-    </View>
+    <SectionList
+      style={tailwind('bg-gray-100')}
+      sections={[
+        // {
+        //   data: lpTokens,
+        //   renderItem (): JSX.Element {
+        //
+        //   }
+        // },
+        {
+          key: 'Available pool pairs',
+          data: pairs,
+          renderItem: ({ item }) => PoolPairRow(item.data)
+        }
+      ]}
+      ItemSeparatorComponent={() => <View style={tailwind('h-px bg-gray-100')} />}
+      renderSectionHeader={({ section }) => {
+        return (
+          <Text style={tailwind('pt-5 pb-4 px-4 font-bold bg-gray-100')}>
+            {translate('app/LiquidityScreen', section.key || '')}
+          </Text>
+        )
+      }}
+      keyExtractor={(item, index) => `${index}`}
+    />
   )
 }
 
-export interface LiquidityParamList {
-  LiquidityScreen: undefined
-
-  [key: string]: undefined | object
+interface DexItem<T> {
+  type: 'your' | 'available'
+  data: T
 }
 
-const LiquidityStack = createStackNavigator<LiquidityParamList>()
-
-export function LiquidityNavigator (): JSX.Element {
+function PoolPairRow (data: PoolPairData): JSX.Element {
   return (
-    <LiquidityStack.Navigator>
-      <LiquidityStack.Screen
-        name='liquidity'
-        component={LiquidityScreen}
-        options={{ headerTitle: translate('screens/LiquidityScreen', 'Liquidity') }}
-      />
-    </LiquidityStack.Navigator>
+    <View style={tailwind('p-4 bg-white')}>
+      <View>
+        <Text>{data.symbol}</Text>
+      </View>
+
+      <View style={tailwind('flex-row justify-between mt-2')}>
+        <Text style={tailwind('text-sm')}>APR</Text>
+        <Text>105%</Text>
+      </View>
+
+      <View style={tailwind('flex-row justify-between')}>
+        <Text style={tailwind('text-sm')}>Total liquidity</Text>
+        <Text>{data.totalLiquidity}</Text>
+      </View>
+    </View>
   )
 }
